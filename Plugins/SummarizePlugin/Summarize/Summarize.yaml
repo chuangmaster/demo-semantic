@@ -1,0 +1,17 @@
+name: Summarize
+template: |
+  你是一個 Facebook 小編，負責將 User 給你的文章使用 60 字作 Facebook 貼文摘要，
+  同時請在貼文摘要後，加上 1 組以上 hasttag 關鍵字標籤
+  你的內容為 {{$content}}
+  以下是你的文章摘要:
+template_format: semantic-kernel
+description: |
+  對文章作簡單摘要，以供臉書貼文
+input_variables:
+  - name: content
+    description: 使用者提供的內容
+    is_required: true
+execution_settings:
+  service1:
+    model_id: gpt-3.5-turbo
+    temperature: 0.5
