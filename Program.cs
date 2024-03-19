@@ -4,9 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 
-// var builder = new ConfigurationBuilder()
-//     .SetBasePath(Directory.GetCurrentDirectory())
-//     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+var builder2 = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
 // IConfigurationRoot configuration = builder.Build();
 
@@ -21,15 +21,16 @@ using Microsoft.Extensions.Hosting;
 // Easy question and answer
 IOpenAi openAi = host.Services.GetRequiredService<IOpenAi>();
 
-await openAi.EasyPromptAskingAsync();
-
+// await openAi.EasyPromptAskingAsync();
 
 // await openAi.UseDateTimePlugin();
-
 
 // await openAi.UseTranslationPlugin(true);
 
 // await openAi.UseSumarizePlugin(false);
+
+
+await openAi.UsechatCompletionAsync(true);
 
 
 

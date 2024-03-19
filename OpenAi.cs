@@ -8,6 +8,8 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using demo_semantic.Plugin.DateTimePlugin;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Configuration;
+using Microsoft.SemanticKernel.ChatCompletion;
+using demo_semantic.Plugins.ReservePlugin;
 
 namespace demo_semantic
 {
@@ -74,6 +76,7 @@ namespace demo_semantic
             DateTimePlugin dateTimePlugin = new DateTimePlugin();
             // kernel.ImportPluginFromObject(dateTimePlugin, "DateTimePlugin");
             kernel.Plugins.AddFromObject(dateTimePlugin);
+            // Enable auto function calling
             OpenAIPromptExecutionSettings settings = new() { ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions };
             var prompt = "請根據 **DateTimePlugin 所提供 UTC0 的時間 **，回答 User 詢問的時間問題. \nUser:";
             while (true)
@@ -169,6 +172,62 @@ namespace demo_semantic
                     System.Console.WriteLine(responose.GetValue<string>());
 
                 }
+
+            }
+        }
+
+        public async Task UsechatCompletionAsync(bool trace = false)
+        {
+            Kernel kernel = Kernel.CreateBuilder()
+               .AddOpenAIChatCompletion("gpt-3.5-turbo", ApiKey)
+               .Build();
+            if (trace)
+            {
+                ShowInvokeLog(kernel);
+            }
+
+            kernel.Plugins.AddFromType<BookMeetingRoom>();
+            // Enable auto function calling
+            OpenAIPromptExecutionSettings settings = new() { ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions };
+            // Get chat completion service
+            // var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+            var prompt = @"
+                            <start>
+                            你是個預約會議室的助理，請你協助 User 來預約會議室，你可以善用 GetFreeRoom method 的 Json 結果，來回答 User 可以使用的辦公室。
+                            範例:
+                            {
+                                ""AvailableRooms"": [
+                                    {
+                                    ""RoomId"": 1,
+                                    ""RoomName"": ""Room A"",
+                                    ""IsAvailable"": true,
+                                    ""StartTime"": ""2024-03-20T12:00:00"",
+                                    ""EndTime"": ""2024-03-20T14:00:00""
+                                    },
+                                    {
+                                    ""RoomId"": 3,
+                                    ""RoomName"": ""Room C"",
+                                    ""IsAvailable"": true,
+                                    ""StartTime"": ""2024-03-20T12:00:00"",
+                                    ""EndTime"": ""2024-03-20T13:00:00""
+                                    }
+                                ]
+                            }
+                            表示 Room A 與 Room C 可以使用
+                            <end>
+                           User:";
+            while (true)
+            {
+                System.Console.Write("User > ");
+                string message = Console.ReadLine() ?? string.Empty;
+
+
+                var responose = await kernel.InvokePromptAsync(prompt + message, new(settings));
+                System.Console.WriteLine("AI says > ");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                System.Console.WriteLine(responose.GetValue<string>());
+                Console.ResetColor();
+
 
             }
 

@@ -6,6 +6,6 @@ namespace demo_semantic
         Task UseSumarizePluginAsync(bool trace = false);
         Task UseDateTimePluginAsync(bool trace = false);
         Task UseTranslationPluginAsync(bool trace = false);
-        
+        Task UsechatCompletionAsync(bool trace = false);
     }
 }
