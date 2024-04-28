@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel.ChatCompletion;
 using demo_semantic.Plugins.ReservePlugin;
+using demo_semantic.Plugins.BenefitRequestPlugin;
 
 namespace demo_semantic
 {
@@ -20,7 +21,7 @@ namespace demo_semantic
         public OpenAi(IConfiguration configuration)
         {
             _Configuration = configuration;
-            ApiKey = configuration["ApiKey"] ?? "ApiKey";
+            ApiKey = configuration.GetValue<string>("ApiKey") ?? "default key";
         }
         public async Task EasyPromptAskingAsync()
         {
@@ -168,7 +169,6 @@ namespace demo_semantic
                         ["content"] = message
                     });
                     System.Console.WriteLine("AI says > ");
-                    Console.ForegroundColor = ConsoleColor.Yellow;
                     System.Console.WriteLine(responose.GetValue<string>());
 
                 }
@@ -176,59 +176,73 @@ namespace demo_semantic
             }
         }
 
-        public async Task UsechatCompletionAsync(bool trace = false)
+        public async Task UseOpenAIChatCompletionAsync(bool trace = false)
         {
-            Kernel kernel = Kernel.CreateBuilder()
-               .AddOpenAIChatCompletion("gpt-3.5-turbo", ApiKey)
-               .Build();
+            IKernelBuilder builder = Kernel.CreateBuilder()
+               .AddOpenAIChatCompletion("gpt-3.5-turbo", ApiKey);
+            builder.Plugins.AddFromType<BenefitRequestPlugin>();
+            Kernel kernel = builder.Build();
             if (trace)
             {
                 ShowInvokeLog(kernel);
             }
-
-            kernel.Plugins.AddFromType<BookMeetingRoom>();
             // Enable auto function calling
             OpenAIPromptExecutionSettings settings = new() { ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions };
             // Get chat completion service
-            // var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
-            var prompt = @"
-                            <start>
-                            你是個預約會議室的助理，請你協助 User 來預約會議室，你可以善用 GetFreeRoom method 的 Json 結果，來回答 User 可以使用的辦公室。
-                            範例:
-                            {
-                                ""AvailableRooms"": [
-                                    {
-                                    ""RoomId"": 1,
-                                    ""RoomName"": ""Room A"",
-                                    ""IsAvailable"": true,
-                                    ""StartTime"": ""2024-03-20T12:00:00"",
-                                    ""EndTime"": ""2024-03-20T14:00:00""
-                                    },
-                                    {
-                                    ""RoomId"": 3,
-                                    ""RoomName"": ""Room C"",
-                                    ""IsAvailable"": true,
-                                    ""StartTime"": ""2024-03-20T12:00:00"",
-                                    ""EndTime"": ""2024-03-20T13:00:00""
-                                    }
-                                ]
-                            }
-                            表示 Room A 與 Room C 可以使用
-                            <end>
-                           User:";
-            while (true)
+            var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+            var historyContent = @"你是一個協助企業內部活動點數申請的助理，可以協助查詢員工所擁有的點數、協助登記點數等功能。
+                           請先確認員工(User)需要什麼服務?
+                           你所提供服務分為以下幾種
+                           - 查詢點數
+                           - 協助申請活動點數
+                           - 根據對話紀錄提供使用點數的明細
+                           ---根據員工提供訊息進行接下來的判斷---
+                           <查詢點數>
+                           請依照以下步驟，協助活動點數查詢
+                           1. 協助確認員工`empId`
+                           2. 呼叫Plugin方法 `GetBenefit`  並使用empId作為參數查詢員工點數
+                           3. 提供以下格式的回應 
+                           您好查詢後的點數為${點數}，謝謝
+
+                           <協助申請活動點數>
+                           請依照以下步驟，協助活動點數申請登記
+                           1. 協助確認員工empId
+                           2. 呼叫Plugin方法 `GetBenefit`  並使用empId作為參數查詢員工點數
+                           3. 詢問員工要申請的[活動內容]與[使用多少點數]
+                           4. 當員工回應的使用點數超過目前所擁有的點數，可以用第2步驟得知是否足夠，必須拒絕申請
+                           5. 當驗證沒有任何問題，呼叫Plugin方法 `DoBenefitApply` 進行點數申請，並提供員工編號、申請的活動、使用的點數
+                           6. 告知申請結果
+
+                           <根據對話紀錄提供使用點數的明細>
+                           1. 根據先前對話告訴員工目前使用點數紀錄
+                           2. 提供以下格式回應
+                           您好查詢後的紀錄為
+                           ${活動1} 使用點數為${點數1}
+                           ${活動2} 使用點數為${點數2}
+
+                           ---
+                           請全部使用中文作為回答方式，且是女性的助理腳色";
+            ChatHistory history = new ChatHistory(historyContent);
+            System.Console.Write("User > ");
+            string? userInput;
+            while (!string.IsNullOrEmpty(userInput = Console.ReadLine()))
             {
-                System.Console.Write("User > ");
-                string message = Console.ReadLine() ?? string.Empty;
+                history.AddUserMessage(userInput);
+
+                var responose = await chatCompletionService.GetChatMessageContentAsync(history, settings, kernel);
+                Console.ForegroundColor = ConsoleColor.Blue;
+
+                System.Console.WriteLine("AI says > " + responose);
 
 
-                var responose = await kernel.InvokePromptAsync(prompt + message, new(settings));
-                System.Console.WriteLine("AI says > ");
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                System.Console.WriteLine(responose.GetValue<string>());
+                // if (!string.IsNullOrEmpty(responose?.InnerContent?.ToString()))
+                // {
+                //     System.Console.WriteLine(aiResponse);
+                // }
+                history.AddMessage(responose.Role, responose.InnerContent?.ToString() ?? "");
+
                 Console.ResetColor();
-
-
+                System.Console.Write("User > ");
             }
 
         }
